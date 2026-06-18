@@ -2,19 +2,31 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SBAR NICU Note V11 - Smart EMR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SBAR NICU Note V12 - Smart EMR</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Roboto', sans-serif; font-size: 12px; margin: 0; padding: 0; background-color: #ffffff; color: #000000; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        /* SỬA LỖI GIAO DIỆN IPHONE TẠI ĐÂY */
+        body { 
+            font-family: 'Roboto', sans-serif; 
+            font-size: 12px; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #ffffff; 
+            color: #000000; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; /* Fallback trình duyệt cũ */
+            height: 100dvh; /* Đơn vị động cho iPhone Safari */
+            overflow: hidden; 
+        }
         
-        /* Mobile Tabs Header */
         .mobile-tabs { display: none; }
         
-        .main-container { display: flex; flex-direction: row; height: 100%; overflow: hidden; }
-        .left-panel, .right-panel { padding: 15px; overflow-y: auto; box-sizing: border-box; }
-        .left-panel { flex: 6; border-right: 1px solid #ddd; padding-bottom: 80px; }
-        .right-panel { flex: 4; background-color: #f9f9f9; display: flex; flex-direction: column; }
+        .main-container { display: flex; flex-direction: row; height: 100%; flex: 1; overflow: hidden; }
+        .left-panel, .right-panel { padding: 15px; box-sizing: border-box; display: flex; flex-direction: column; }
+        .left-panel { flex: 6; border-right: 1px solid #ddd; overflow-y: auto; padding-bottom: 40px; }
+        .right-panel { flex: 4; background-color: #f9f9f9; overflow: hidden; } /* Ngăn không cho panel phải cuộn tràn ra ngoài */
         
         @media (max-width: 768px) {
             .mobile-tabs { display: flex; background: #fff; border-bottom: 2px solid #007bff; width: 100%; flex-shrink: 0; }
@@ -22,15 +34,23 @@
             .mobile-tab.active { color: #007bff; border-bottom: 3px solid #007bff; background: #f1f8ff;}
             
             .main-container { flex-direction: column; }
-            .left-panel, .right-panel { height: 100%; border-right: none; padding-bottom: 20px;}
-            .right-panel { background-color: #ffffff; }
+            .left-panel, .right-panel { height: 100%; border-right: none; }
+            .right-panel { 
+                background-color: #ffffff; 
+                padding-bottom: 25px; /* Khoảng trống cho dễ bấm */
+            }
             .panel-inactive { display: none !important; }
         }
 
-        h3 { margin-top: 0; font-size: 14px; color: #007bff; border-bottom: 1px solid #007bff; padding-bottom: 5px; }
+        /* Hỗ trợ khoảng đệm thanh Home nằm ngang của iPhone */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .right-panel { padding-bottom: calc(15px + env(safe-area-inset-bottom)); }
+        }
+
+        h3 { margin-top: 0; font-size: 14px; color: #007bff; border-bottom: 1px solid #007bff; padding-bottom: 5px; flex-shrink: 0; }
         h4 { margin: 15px 0 5px 0; font-size: 13px; color: #333; background: #f1f1f1; padding: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;}
         
-        .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; align-items: center;}
+        .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; align-items: center; flex-shrink: 0;}
         .col { flex: 1; min-width: 80px; }
         .col-auto { flex: 0 0 auto; }
         
@@ -40,19 +60,31 @@
             padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
         }
         input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; transform: scale(1.2); }
-        textarea { resize: vertical; }
         
         .hidden { display: none !important; }
         .btn-toggle { padding: 4px 8px; border: 1px solid #ccc; background: #eee; cursor: pointer; border-radius: 4px; font-size: 11px;}
         .btn-toggle.active { background: #007bff; color: white; border-color: #007bff; }
         
-        #output-text { flex-grow: 1; resize: none; margin-bottom: 10px; border: 1px solid #aaa; border-radius: 4px; padding: 10px; font-size: 14px; line-height: 1.5; color: #111;}
-        .footer-tools { display: flex; justify-content: space-between; align-items: center; }
+        /* Chỉnh lại TextArea để nó tự thu nhỏ lại nhường chỗ cho nút Copy */
+        #output-text { 
+            flex: 1; /* Chiếm phần không gian còn lại */
+            min-height: 0; /* Quan trọng: Cho phép thu nhỏ lại chứ không tràn viền */
+            resize: none; 
+            margin-bottom: 10px; 
+            border: 1px solid #aaa; 
+            border-radius: 4px; 
+            padding: 10px; 
+            font-size: 14px; 
+            line-height: 1.5; 
+            color: #111;
+        }
+        
+        .footer-tools { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;}
         .warning { color: red; font-weight: bold; }
         
         .btn-action { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 11px;}
         .btn-save { background: #28a745; }
-        .btn-copy { background: #17a2b8; width: 100%; padding: 12px; font-size: 14px;}
+        .btn-copy { background: #17a2b8; width: 100%; padding: 14px; font-size: 14px; flex-shrink: 0; margin-top: 5px; border-radius: 8px;}
         .btn-shift { background: #ffc107; color: #000; border: none; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer; }
         
         .grid-full { display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 1.5fr; gap: 4px; margin-bottom: 6px; align-items: start;}
@@ -62,7 +94,6 @@
         
         .lab-header { font-weight: bold; font-size: 10px; color: #777; align-items: center;}
         .group-label { font-size: 12px; font-weight: bold; color: #007bff; margin: 15px 0 5px 0; border-bottom: 1px solid #007bff; padding-bottom: 3px; display: flex; justify-content: space-between; align-items: center;}
-        
         .group-date-inputs { display: flex; gap: 4px; width: 75%; align-items: center; font-size: 11px; font-weight: 400; color: #444;}
         .group-date-inputs span { white-space: nowrap; }
         
@@ -287,7 +318,6 @@
 
             <div id="sec_dieu_tri" style="margin-top: 15px;">
                 <h4>Điều trị (Θ)</h4>
-                
                 <div class="row">
                     <div class="col"><label>Vận mạch</label><input type="text" id="van_mach" oninput="updateOutput()"></div>
                     <div class="col" style="flex:2;"><label>Kháng sinh</label><input type="text" id="khang_sinh" oninput="updateOutput()"></div>
@@ -385,23 +415,21 @@ huyết đồ:HĐ</textarea>
         </div>
 
         <div class="right-panel" id="output-form">
-            <h3 style="margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="display: flex; justify-content: space-between; align-items: center;">
                 Kết quả SBAR
                 <button type="button" class="btn-action btn-save" onclick="saveToCloudDB()">☁️ Lưu DB</button>
             </h3>
-            <textarea id="output-text" oninput="checkCharCount()"></textarea>
+            <textarea id="output-text" readonly></textarea>
             <div class="footer-tools">
                 <span id="char-count">0/1000 ký tự</span>
             </div>
-            <button type="button" class="btn-action btn-copy" style="margin-top:10px;" onclick="copyRawText()">📋 Copy Văn bản</button>
+            <button type="button" class="btn-action btn-copy" onclick="copyRawText()">📋 Copy Văn bản SBAR</button>
         </div>
     </div>
 
     <script>
-        // --- HARDCODED GOOGLE APPS SCRIPT URL ---
         const CLOUD_URL = "https://script.google.com/macros/s/AKfycbxXqnXNZJfXo0eNA5E6ujEus3h8BeT9FBL-JnIfG3yKZlhVfvuor4eGKGvjqOAfS97fjw/exec";
 
-        // --- DATA LÂM SÀNG ---
         const hdLabs = [ { id: "wbc", name: "WBC" }, { id: "neu", name: "Neutrophil" }, { id: "band", name: "Band neu (%)" }, { id: "plt", name: "PLT" } ];
         const ionLabs = [ { id: "na", name: "Na" }, { id: "k", name: "K" }, { id: "ca", name: "Ca" } ];
         const kmLabs = [ { id: "km_ph", name: "pH" }, { id: "km_pco2", name: "pCO2" }, { id: "km_be", name: "BE" }, { id: "km_oi", name: "OI" }, { id: "km_doc", name: "Đọc KQ", noOld: true } ];
@@ -415,7 +443,6 @@ huyết đồ:HĐ</textarea>
 
         let globalCloudHistory = [];
 
-        // --- GIAO DIỆN MOBILE TABS ---
         function switchTab(tab) {
             if(window.innerWidth > 768) return;
             document.querySelectorAll('.mobile-tab').forEach(e => e.classList.remove('active'));
@@ -427,6 +454,7 @@ huyết đồ:HĐ</textarea>
                 document.getElementById('tab-output').classList.add('active');
                 document.getElementById('input-form').classList.add('panel-inactive');
                 document.getElementById('output-form').classList.remove('panel-inactive');
+                updateOutput(); // Force update when switching to result tab
             }
         }
 
@@ -435,11 +463,10 @@ huyết đồ:HĐ</textarea>
                 document.getElementById('input-form').classList.remove('panel-inactive');
                 document.getElementById('output-form').classList.remove('panel-inactive');
             } else {
-                switchTab('input'); // Default tab on resize to mobile
+                switchTab('input');
             }
         }
 
-        // --- RENDER HTML ---
         function renderGroupRow(item, hasTrend) {
             let html = `<div class="${hasTrend ? 'grid-nodate-trend' : 'grid-nodate-notrend'}" style="border-bottom: 1px dashed #eee; padding-bottom: 3px;">`;
             html += `<div style="font-size: 11px; font-weight:500;">${item.name}</div>`;
@@ -471,7 +498,6 @@ huyết đồ:HĐ</textarea>
             document.getElementById('imaging_container').innerHTML = imagingTests.map(l => renderFullRow(l, true)).join('');
         }
 
-        // --- DỊCH CHUYỂN DỮ LIỆU MỚI -> CŨ ---
         function moveVal(id) {
             const valEl = document.getElementById(`${id}_val`), oldEl = document.getElementById(`${id}_old_val`), trendEl = document.getElementById(`${id}_trend`);
             if(valEl && oldEl && valEl.value) { oldEl.value = valEl.value; valEl.value = ''; }
@@ -495,7 +521,6 @@ huyết đồ:HĐ</textarea>
         }
         function shiftAllLabs() { shiftGroupLabs('hd'); shiftGroupLabs('ion'); shiftGroupLabs('km'); shiftGroupLabs('other'); shiftGroupLabs('img'); }
 
-        // --- CLOUD DATABASE CONNECTIVITY ---
         function showLoading(status) { document.getElementById('loading_indicator').style.display = status ? 'inline-block' : 'none'; }
 
         function fetchPatientFromCloud() {
@@ -512,7 +537,7 @@ huyết đồ:HĐ</textarea>
                         document.getElementById('phong').value = res.patient.phong || '';
                         document.getElementById('giuong').value = res.patient.giuong || '';
                         document.getElementById('gio_sinh').value = res.patient.gio_sinh || '';
-                    } else alert("Số hồ sơ mới, chưa có thông tin hành chính. Bạn cứ nhập liệu bình thường.");
+                    } else alert("Hồ sơ trống. Bạn có thể nhập mới.");
                     
                     const select = document.getElementById('sbar_history');
                     select.innerHTML = '<option value="">-- Chọn bản ghi cũ --</option>';
@@ -523,7 +548,7 @@ huyết đồ:HĐ</textarea>
                         globalCloudHistory.forEach((item, index) => {
                             let opt = document.createElement('option'); opt.value = index; opt.text = `Bản ghi: ${item.time}`; select.appendChild(opt);
                         });
-                        alert(`Phát hiện ${globalCloudHistory.length} bản SBAR cũ lưu trên Cloud.`);
+                        alert(`Phát hiện ${globalCloudHistory.length} bản SBAR cũ.`);
                     } else document.getElementById('history-box').classList.add('hidden');
                     updateOutput();
                 } else alert("Lỗi server: " + res.message);
@@ -535,7 +560,7 @@ huyết đồ:HĐ</textarea>
             const idx = document.getElementById('sbar_history').value;
             if(idx === "") return;
             const data = globalCloudHistory[idx].data;
-            for(let key in data) { let el = document.getElementById(key); if(el) el.value = data[key]; }
+            for(let key in data) { let el = document.getElementById(key); if(el) { if(el.type === 'checkbox') el.checked = data[key]; else el.value = data[key]; } }
             updateOutput();
         }
 
@@ -563,7 +588,6 @@ huyết đồ:HĐ</textarea>
         }
         function saveToCloudDB() { saveCloudDB(); }
 
-        // --- THUẬT TOÁN TÍNH TUỔI SƠ SINH CHUẨN LÂM SÀNG ---
         function parseVNDate(str) {
             if(!str) return null;
             str = str.toLowerCase().trim();
@@ -594,7 +618,6 @@ huyết đồ:HĐ</textarea>
             return res;
         }
 
-        // --- CÁC HÀM UI CƠ BẢN ---
         function toggleCustomInput(selectId, inputId) { document.getElementById(inputId + '_div').classList.toggle('hidden', document.getElementById(selectId).value !== 'Khác'); updateOutput(); }
         function toggleBtn(btn) { btn.classList.toggle('active'); updateOutput(); }
         function toggleSuaBtn(btn, value) { document.getElementById('btn_tieu').classList.remove('active'); document.getElementById('btn_ko_tieu').classList.remove('active'); btn.classList.add('active'); document.getElementById('tinh_trang_sua').value = value; updateOutput(); }
@@ -642,7 +665,6 @@ huyết đồ:HĐ</textarea>
             updateOutput();
         }
 
-        // --- CORE CHUỖI SBAR (TÍCH HỢP TÍNH TOÁN DỊCH) ---
         function getVal(id) { return document.getElementById(id) ? document.getElementById(id).value.trim() : ""; }
         function formatNum(num) { return num ? Number(num).toLocaleString('vi-VN') : ""; }
 
@@ -674,7 +696,6 @@ huyết đồ:HĐ</textarea>
             if(getVal('co_dia')) delta.push(getVal('co_dia'));
             if(delta.length > 0) out.push(`Δ: ${delta.join(' - ')}`);
 
-            // --- PHẦN A THỰC THỂ ---
             let aArr = [];
             let tg = getVal('tri_giac'); if(tg === 'Khác') tg = getVal('tri_giac_khac'); if(tg) aArr.push(tg);
 
@@ -717,7 +738,7 @@ huyết đồ:HĐ</textarea>
             if(getVal('dich')) aArr.push(`dịch: ${getVal('dich')}`);
             if(getVal('thuc_the_khac')) aArr.push(getVal('thuc_the_khac'));
 
-            // --- CẬN LÂM SÀNG ---
+            // CLS
             let clsArr = [];
             const wbc = getVal('wbc_val'), neu = getVal('neu_val'), plt = getVal('plt_val');
             if (wbc || neu || plt) {
@@ -782,20 +803,17 @@ huyết đồ:HĐ</textarea>
                 }
             });
 
-            // GỘP A CƠ BẢN
             let aFull = [];
             if(aArr.length > 0) aFull.push(aArr.join(', '));
             if(clsArr.length > 0) aFull.push("CLS:\n" + clsArr.join('\n'));
 
-            // --- XỬ LÝ ĐIỀU TRỊ (Θ) ---
+            // THETA - ĐIỀU TRỊ
             let thetaArr = [];
             const vm = getVal('van_mach'); if(vm) thetaArr.push(vm);
             const ks = getVal('khang_sinh'); if(ks) thetaArr.push(`KS: ${ks}`);
             
-            // Xử lý Dịch pha & Chế phẩm
             let d_time = parseFloat(getVal('d_time')) || 24;
             let d_rate = parseFloat(getVal('d_rate'));
-            
             let t_ngung = 0, t_1ml = 0;
             let dichStrArr = [];
             
@@ -817,10 +835,8 @@ huyết đồ:HĐ</textarea>
                 let total_vol = (t_normal * d_rate) + (t_1ml * 1) + (cath_t * cath_rate);
                 dichStrArr.unshift(`dịch pha: ${total_vol.toFixed(1)}/${d_time} giờ`);
             }
-
             if(dichStrArr.length > 0) thetaArr.push(`V nhập: ${dichStrArr.join(', ')}`);
 
-            // Xử lý Bicarbonate
             let bicar_ml = parseFloat(getVal('bicar_ml'));
             if(!isNaN(bicar_ml)) {
                 let cn = parseFloat(getVal('cn_ht')); if(isNaN(cn) || cn<=0) cn = parseFloat(getVal('cn_ls'));
@@ -832,20 +848,15 @@ huyết đồ:HĐ</textarea>
 
             const thuoc = getVal('thuoc_khac'); if(thuoc) thetaArr.push(thuoc);
 
-            // Gộp Điều trị vào A
             if(thetaArr.length > 0) aFull.push(`Θ: ${thetaArr.join(', ')}`);
 
-            // Hội chẩn
             if(!document.getElementById('sec_hoi_chan').classList.contains('hidden') && getVal('hoi_chan')) aFull.push(`HC: ${getVal('hoi_chan')}`);
             if(getVal('ghi_chu')) aFull.push(getVal('ghi_chu'));
             
-            // Output A
             if(aFull.length > 0) out.push(`A:\n${aFull.join('\n')}`);
 
-            // R
             if(getVal('recommendation')) out.push(`R: ${getVal('recommendation')}`);
 
-            // TỪ ĐIỂN UNICODE
             let finalStr = out.join('\n');
             const dictStr = getVal('dict');
             if(dictStr) {
@@ -873,7 +884,9 @@ huyết đồ:HĐ</textarea>
         
         function copyRawText() {
             const textarea = document.getElementById('output-text');
-            navigator.clipboard.writeText(textarea.value).then(() => alert("Đã Copy SBAR! Paste vào Viber sẽ không bị mất gạch đầu dòng."));
+            navigator.clipboard.writeText(textarea.value).then(() => {
+                alert("Đã Copy SBAR! Định dạng dấu gạch đầu dòng (-) được giữ nguyên để paste vào Viber.");
+            });
         }
 
         window.onload = () => { initLabInputs(); applyTemplate(); handleResize(); };
