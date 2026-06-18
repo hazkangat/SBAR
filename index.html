@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBAR NICU Note V10 - Cloud EMR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', sans-serif; font-size: 12px; margin: 0; padding: 0; background-color: #ffffff; color: #000000; display: flex; height: 100vh; overflow: hidden; }
+        .left-panel, .right-panel { padding: 15px; overflow-y: auto; box-sizing: border-box; }
+        .left-panel { flex: 6; border-right: 1px solid #ddd; padding-bottom: 50px; }
+        .right-panel { flex: 4; background-color: #f9f9f9; display: flex; flex-direction: column; }
+        
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .left-panel { flex: none; height: 55vh; border-right: none; }
+            .right-panel { flex: none; height: 45vh; border-top: 2px solid #007bff; position: fixed; bottom: 0; width: 100%; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 10; }
+        }
+
+        h3 { margin-top: 0; font-size: 14px; color: #007bff; border-bottom: 1px solid #007bff; padding-bottom: 5px; }
+        h4 { margin: 15px 0 5px 0; font-size: 13px; color: #333; background: #f1f1f1; padding: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;}
+        
+        .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; align-items: center;}
+        .col { flex: 1; min-width: 80px; }
+        .col-auto { flex: 0 0 auto; }
+        
+        label { display: block; font-weight: 500; margin-bottom: 2px; font-size: 11px; color: #555;}
+        input[type="text"], input[type="number"], select, textarea {
+            width: 100%; font-family: 'Roboto', sans-serif; font-size: 12px;
+            padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+        }
+        textarea { resize: vertical; }
+        
+        .hidden { display: none !important; }
+        .btn-toggle { padding: 4px 8px; border: 1px solid #ccc; background: #eee; cursor: pointer; border-radius: 4px; font-size: 11px;}
+        .btn-toggle.active { background: #007bff; color: white; border-color: #007bff; }
+        
+        #output-text { flex-grow: 1; resize: none; margin-bottom: 10px; border: 1px solid #aaa; border-radius: 4px; padding: 10px; font-size: 13px; line-height: 1.4;}
+        .footer-tools { display: flex; justify-content: space-between; align-items: center; }
+        .warning { color: red; font-weight: bold; }
+        
+        .btn-action { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 11px;}
+        .btn-save { background: #28a745; }
+        .btn-copy { background: #17a2b8; width: 100%; padding: 10px; font-size: 13px;}
+        .btn-shift { background: #ffc107; color: #000; border: none; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: bold; cursor: pointer; }
+        
+        .grid-full { display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 1.5fr; gap: 4px; margin-bottom: 6px; align-items: start;}
+        .grid-img { display: grid; grid-template-columns: 1.5fr 2fr 0.8fr 2fr 1.2fr; gap: 4px; margin-bottom: 6px; align-items: start;}
+        .grid-nodate-trend { display: grid; grid-template-columns: 2fr 2fr 1fr 2fr; gap: 4px; margin-bottom: 4px; align-items: start;}
+        .grid-nodate-notrend { display: grid; grid-template-columns: 2fr 2.5fr 2.5fr; gap: 4px; margin-bottom: 4px; align-items: start;}
+        
+        .lab-header { font-weight: bold; font-size: 10px; color: #777; align-items: center;}
+        .group-label { font-size: 12px; font-weight: bold; color: #007bff; margin: 15px 0 5px 0; border-bottom: 1px solid #007bff; padding-bottom: 3px; display: flex; justify-content: space-between; align-items: center;}
+        
+        .group-date-inputs { display: flex; gap: 4px; width: 75%; align-items: center; font-size: 11px; font-weight: 400; color: #444;}
+        .group-date-inputs span { white-space: nowrap; }
+        
+        .db-panel { background: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px solid #90caf9;}
+        .loading-text { color: #ff8f00; font-weight: bold; margin-left: 10px; display: none;}
+    </style>
+</head>
+<body>
+
+    <div class="left-panel" id="input-form">
+        <div class="db-panel">
+            <div class="row" style="margin-bottom: 0;">
+                <div class="col" style="flex: 2;">
+                    <label>Số hồ sơ</label>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <input type="text" id="shs" placeholder="Nhập SHS..." oninput="updateOutput()">
+                        <button type="button" class="btn-action" onclick="fetchPatientFromCloud()">Tìm dữ liệu</button>
+                    </div>
+                </div>
+                <div class="col hidden" style="flex: 3;" id="history-box">
+                    <label>Lịch sử SBAR</label>
+                    <select id="sbar_history" onchange="loadCloudSBARRecord()">
+                        <option value="">-- Chọn bản ghi cũ --</option>
+                    </select>
+                </div>
+            </div>
+            <span id="loading_indicator" class="loading-text">🔄 Đang giao tiếp với máy chủ Google...</span>
+        </div>
+
+        <div class="row">
+            <div class="col"><label>Template</label>
+                <select id="template" onchange="applyTemplate()">
+                    <option value="khac">Khác</option><option value="khang_sinh">Kháng sinh</option><option value="surfactant">Surfactant</option><option value="bao_benh">Báo bệnh</option>
+                </select>
+            </div>
+            <div class="col"><label>Thời điểm báo cáo</label><input type="text" id="time_report" oninput="updateOutput()"></div>
+        </div>
+
+        <div class="row">
+            <div class="col"><label>Phòng</label><input type="text" id="phong" oninput="updateOutput()"></div>
+            <div class="col"><label>Giường</label><input type="text" id="giuong" oninput="updateOutput()"></div>
+            <div class="col" style="flex: 2;"><label>Tên NB</label><input type="text" id="ten_nb" oninput="updateOutput()"></div>
+        </div>
+
+        <div class="row">
+            <div class="col"><label>S: Vấn đề lâm sàng</label><textarea id="situation" rows="2" oninput="updateOutput()"></textarea></div>
+        </div>
+
+        <h4>B: Thông tin nền</h4>
+        <div class="row">
+            <div class="col"><label>Giờ sinh và Ngày sinh</label><input type="text" id="gio_sinh" placeholder="VD: 8g30 15/6" oninput="updateOutput()"></div>
+            <div class="col"><label>Tuổi thai (tuần)</label><input type="number" id="thai_tuan" oninput="updateOutput()"></div>
+            <div class="col"><label>Tuổi thai (ngày)</label><input type="number" id="thai_ngay" oninput="updateOutput()"></div>
+        </div>
+        <div class="row">
+            <div class="col"><label>CN lúc sinh (g)</label><input type="number" id="cn_ls" oninput="updateOutput()"></div>
+            <div class="col"><label>BPV (LS)</label><input type="text" id="bpv_ls" oninput="updateOutput()"></div>
+            <div class="col"><label>CN hiện tại (g)</label><input type="number" id="cn_ht" oninput="calcUrine(); updateOutput()"></div>
+            <div class="col"><label>BPV (HT)</label><input type="text" id="bpv_ht" oninput="updateOutput()"></div>
+        </div>
+        <div class="row">
+            <div class="col" style="flex:2"><label>Δ chính</label><input type="text" id="chan_doan_chinh" oninput="updateOutput()"></div>
+            <div class="col"><label>ICD-10</label><input type="text" id="icd_chinh" oninput="updateOutput()"></div>
+        </div>
+        <div class="row">
+            <div class="col" style="flex:2"><label>Δ phụ</label><input type="text" id="chan_doan_phu" oninput="updateOutput()"></div>
+            <div class="col"><label>ICD-10</label><input type="text" id="icd_phu" oninput="updateOutput()"></div>
+        </div>
+        <div class="row">
+            <div class="col"><label>Cơ địa</label><input type="text" id="co_dia" oninput="updateOutput()"></div>
+        </div>
+
+        <h4>A: Đánh giá lâm sàng (Thực thể)</h4>
+        <div class="row">
+            <div class="col-auto"><label>Tri giác</label></div>
+            <div class="col">
+                <select id="tri_giac" onchange="toggleCustomInput('tri_giac', 'tri_giac_khac')">
+                    <option value="">--Chọn--</option><option value="Tỉnh">Tỉnh</option><option value="Mê">Mê</option><option value="Li bì">Li bì</option><option value="Lừ đừ">Lừ đừ</option><option value="Khác">Khác</option>
+                </select>
+            </div>
+            <div class="col hidden" id="tri_giac_khac_div"><input type="text" id="tri_giac_khac" oninput="updateOutput()"></div>
+        </div>
+
+        <div class="row" style="align-items: flex-start;">
+            <div class="col-auto"><label>Hô hấp</label></div>
+            <div class="col">
+                <select id="ho_hap" onchange="handleHoHapChange()">
+                    <option value="">--Chọn--</option><option value="Suy hô hấp">Suy hô hấp</option><option value="Khác">Khác</option>
+                </select>
+            </div>
+            <div class="col hidden" id="ho_hap_khac_div"><input type="text" id="ho_hap_khac" oninput="updateOutput()"></div>
+        </div>
+        
+        <div id="ho_hap_params" class="hidden" style="margin-left: 20px; border-left: 2px solid #007bff; padding-left: 10px;">
+            <div class="row">
+                <div class="col">
+                    <select id="phuong_thuc_tho" onchange="handlePhuongThucTho()">
+                        <option value="">--Phương thức--</option><option value="Oxy">Oxy</option><option value="CPAP">CPAP</option><option value="NIPPV">NIPPV</option><option value="SIMV">SIMV</option><option value="HFOV">HFOV</option>
+                    </select>
+                </div>
+                <div class="col hidden" id="div_may"><input type="text" id="hh_may" placeholder="Máy" oninput="updateOutput()"></div>
+                <div class="col hidden" id="div_fio2"><input type="number" id="hh_fio2" placeholder="FiO2" oninput="updateOutput()"></div>
+                <div class="col hidden" id="div_p"><input type="number" id="hh_p" placeholder="P" oninput="updateOutput()"></div>
+                <div class="col hidden" id="div_pip"><input type="number" id="hh_pip" placeholder="PIP" oninput="updateOutput()"></div>
+                <div class="col hidden" id="div_peep"><input type="number" id="hh_peep" placeholder="PEEP" oninput="updateOutput()"></div>
+                <div class="col hidden" id="div_rr"><input type="number" id="hh_rr" placeholder="RR" oninput="updateOutput()"></div>
+                <div class="col hidden" id="div_map"><input type="number" id="hh_map" placeholder="MAP" oninput="updateOutput()"></div>
+                <div class="col hidden" id="div_dp"><input type="number" id="hh_dp" placeholder="ΔP" oninput="updateOutput()"></div>
+                <div class="col hidden" id="div_flow"><input type="number" id="hh_flow" placeholder="Flow" oninput="updateOutput()"></div>
+            </div>
+            <div class="row">
+                <button type="button" class="btn-toggle" id="btn_oxy_hoa" onclick="toggleBtn(this)">Đạt oxy hoá</button>
+                <button type="button" class="btn-toggle" id="btn_thong_khi" onclick="toggleBtn(this)">Đạt thông khí</button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col"><label>Mạch (l/p)</label><input type="text" id="mach" oninput="updateOutput()"></div>
+            <div class="col"><label>Vận mạch</label><input type="text" id="van_mach" oninput="updateOutput()"></div>
+            <div class="col"><label>Tiểu (mL)</label><input type="number" id="tieu_ml" oninput="calcUrine()"></div>
+            <div class="col"><label>Trong (giờ)</label><input type="number" id="tieu_gio" oninput="calcUrine()"></div>
+            <div class="col"><label>Tốc độ tiểu</label><input type="text" id="tieu_kq" readonly style="background: #eee;"></div>
+        </div>
+
+        <div class="row">
+            <div class="col-auto"><label>Tiêu hoá</label></div>
+            <div class="col-auto">
+                <select id="tieu_hoa_type" onchange="handleTieuHoa()">
+                    <option value="">--Chọn--</option><option value="TPN">TPN</option><option value="AnSua">Ăn sữa</option>
+                </select>
+            </div>
+            <div class="col"><input type="text" id="bung" placeholder="Bụng" oninput="updateOutput()"></div>
+        </div>
+        <div id="tieu_hoa_tpn" class="row hidden" style="margin-left: 20px;">
+            <div class="col"><input type="number" id="tpn_v" placeholder="V (mL/kg)" oninput="updateOutput()"></div>
+            <div class="col"><input type="number" id="tpn_e" placeholder="E (kCal/kg)" oninput="updateOutput()"></div>
+            <div class="col"><input type="number" id="tpn_kg" placeholder="kG" oninput="updateOutput()"></div>
+            <div class="col"><input type="number" id="tpn_vk" placeholder="vK" oninput="updateOutput()"></div>
+        </div>
+        <div id="tieu_hoa_sua" class="row hidden" style="margin-left: 20px;">
+            <div class="col"><input type="text" id="sua_loai" placeholder="Loại sữa" oninput="updateOutput()"></div>
+            <div class="col"><input type="number" id="sua_v" placeholder="V (mL/kg)" oninput="updateOutput()"></div>
+            <div class="col-auto">
+                <button type="button" class="btn-toggle active" id="btn_tieu" onclick="toggleSuaBtn(this, 'Tiêu')">Tiêu</button>
+                <button type="button" class="btn-toggle" id="btn_ko_tieu" onclick="toggleSuaBtn(this, 'Không tiêu')">Không tiêu</button>
+                <input type="hidden" id="tinh_trang_sua" value="Tiêu">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-auto"><label>Thóp</label></div>
+            <div class="col">
+                <select id="thop" onchange="toggleCustomInput('thop', 'thop_khac')">
+                    <option value="">--Chọn--</option><option value="phẳng">phẳng</option><option value="phồng">phồng</option><option value="lõm">lõm</option><option value="khác">khác</option>
+                </select>
+            </div>
+            <div class="col hidden" id="thop_khac_div"><input type="text" id="thop_khac" oninput="updateOutput()"></div>
+            
+            <div class="col"><label>Co giật</label><input type="text" id="co_giat" oninput="updateOutput()"></div>
+            <div class="col"><label>Tình trạng dịch</label><input type="text" id="dich" oninput="updateOutput()"></div>
+        </div>
+        <div class="row">
+            <div class="col"><label>Khác (Thực thể)</label><input type="text" id="thuc_the_khac" oninput="updateOutput()"></div>
+        </div>
+
+        <div id="sec_cls">
+            <h4>Cận lâm sàng <button type="button" class="btn-shift" onclick="shiftAllLabs()">Chuyển tất cả KQ Mới ➡ Cũ</button></h4>
+            
+            <div class="group-label">
+                <span>Huyết đồ <button type="button" class="btn-shift" onclick="shiftGroupLabs('hd')">Mới ➡ Cũ</button></span>
+                <div class="group-date-inputs">
+                    <span>T.điểm Mới:</span><input type="text" id="hd_date" oninput="updateOutput()">
+                    <span>Cũ:</span><input type="text" id="hd_old_date" oninput="updateOutput()">
+                    <select id="hd_comp" onchange="updateOutput()"><option value="">- Đánh giá -</option><option value="cải thiện">Cải thiện</option><option value="xấu hơn">Xấu hơn</option><option value="không đổi">Ko đổi</option></select>
+                </div>
+            </div>
+            <div class="grid-nodate-trend lab-header"><div>XN</div><div>KQ Mới</div><div>Trend</div><div>KQ Cũ</div></div>
+            <div id="hd_container"></div>
+
+            <div class="group-label">
+                <span>Điện giải đồ <button type="button" class="btn-shift" onclick="shiftGroupLabs('ion')">Mới ➡ Cũ</button></span>
+                <div class="group-date-inputs">
+                    <span>T.điểm Mới:</span><input type="text" id="ion_date" oninput="updateOutput()">
+                    <span>Cũ:</span><input type="text" id="ion_old_date" oninput="updateOutput()">
+                    <select id="ion_comp" onchange="updateOutput()"><option value="">- Đánh giá -</option><option value="cải thiện">Cải thiện</option><option value="xấu hơn">Xấu hơn</option><option value="không đổi">Ko đổi</option></select>
+                </div>
+            </div>
+            <div class="grid-nodate-trend lab-header"><div>XN</div><div>KQ Mới</div><div>Trend</div><div>KQ Cũ</div></div>
+            <div id="ion_container"></div>
+
+            <div class="group-label">
+                <span>Khí máu ĐM <button type="button" class="btn-shift" onclick="shiftGroupLabs('km')">Mới ➡ Cũ</button></span>
+                <div class="group-date-inputs">
+                    <span>T.điểm Mới:</span><input type="text" id="km_date" oninput="updateOutput()">
+                    <span>Cũ:</span><input type="text" id="km_old_date" oninput="updateOutput()">
+                    <select id="km_comp" onchange="updateOutput()"><option value="">- Đánh giá -</option><option value="cải thiện">Cải thiện</option><option value="xấu hơn">Xấu hơn</option><option value="không đổi">Ko đổi</option></select>
+                </div>
+            </div>
+            <div class="grid-nodate-notrend lab-header"><div>Thông số</div><div>KQ Mới</div><div>KQ Cũ</div></div>
+            <div id="km_container"></div>
+
+            <div class="group-label" style="border: none;">
+                <span>Các XN khác <button type="button" class="btn-shift" onclick="shiftGroupLabs('other')">Mới ➡ Cũ</button></span>
+            </div>
+            <div class="grid-full lab-header"><div>Tên XN</div><div>KQ Mới</div><div>T.điểm Mới</div><div>Trend</div><div>KQ Cũ</div></div>
+            <div id="lab_container"></div> 
+            
+            <div class="group-label" style="border: none;">
+                <span>Chẩn đoán hình ảnh <button type="button" class="btn-shift" onclick="shiftGroupLabs('img')">Mới ➡ Cũ</button></span>
+            </div>
+            <div class="grid-img lab-header"><div>Hình ảnh</div><div>KQ Mới</div><div>T.điểm Mới</div><div>Trend</div><div>KQ Cũ</div></div>
+            <div id="imaging_container"></div>
+        </div>
+
+        <div id="sec_hoi_chan">
+            <h4>Hội chẩn & Ghi chú</h4>
+            <div class="row"><div class="col"><textarea id="hoi_chan" rows="2" oninput="updateOutput()"></textarea></div></div>
+        </div>
+        <div class="row">
+            <div class="col"><label>Các ghi chú khác</label><textarea id="ghi_chu" rows="2" oninput="updateOutput()"></textarea></div>
+        </div>
+
+        <h4>R: Đề xuất (Recommendation)</h4>
+        <div class="row"><div class="col"><textarea id="recommendation" rows="3" oninput="updateOutput()"></textarea></div></div>
+
+        <hr style="margin: 20px 0;">
+        <div class="row">
+            <div class="col">
+                <label>Từ điển viết tắt</label>
+                <textarea id="dict" rows="7" oninput="updateOutput()">người bệnh:NB
+bệnh nhân:NB
+suy hô hấp:SHH
+siêu âm:SÂ
+X-quang ngực:XQ ngực
+X-quang:XQ
+hội chẩn:HC
+kháng sinh:KS
+nội khí quản:NKQ
+bệnh màng trong:BMT
+cân nặng lúc sinh:CNLS
+cân nặng hiện tại:CNHT
+cận lâm sàng:CLS
+nhiễm trùng huyết sơ sinh:NTHSS
+kết quả:KQ
+về vấn đề:v/v
+động mạch:ĐM
+tĩnh mạch:TM
+phải:P
+trái:T
+điện giải:ĐGĐ
+huyết đồ:HĐ</textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <h3 style="margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">
+            Kết quả SBAR
+            <button type="button" class="btn-action btn-save" onclick="saveToCloudDB()">☁️ Lưu vào Cloud</button>
+        </h3>
+        <textarea id="output-text" oninput="checkCharCount()"></textarea>
+        <div class="footer-tools">
+            <span id="char-count">0/1000 ký tự</span>
+            <button type="button" class="btn-action btn-copy" onclick="copyRawText()">📋 Copy Văn bản</button>
+        </div>
+    </div>
+
+    <script>
+        // --- HARDCODED GOOGLE APPS SCRIPT URL ---
+        const CLOUD_URL = "https://script.google.com/macros/s/AKfycbxXqnXNZJfXo0eNA5E6ujEus3h8BeT9FBL-JnIfG3yKZlhVfvuor4eGKGvjqOAfS97fjw/exec";
+
+        // --- DATA ---
+        const hdLabs = [ { id: "wbc", name: "WBC" }, { id: "neu", name: "Neutrophil" }, { id: "band", name: "Band neu (%)" }, { id: "plt", name: "PLT" } ];
+        const ionLabs = [ { id: "na", name: "Na" }, { id: "k", name: "K" }, { id: "ca", name: "Ca" } ];
+        const kmLabs = [ { id: "km_ph", name: "pH" }, { id: "km_pco2", name: "pCO2" }, { id: "km_be", name: "BE" }, { id: "km_oi", name: "OI" }, { id: "km_doc", name: "Đọc KQ", noOld: true } ];
+        
+        const otherLabs = [ 
+            { id: "crp", name: "CRP (mg/L)" }, 
+            { id: "pct", name: "Procalcitonin (ng/mL)" }, 
+            { id: "cay_mau", name: "Cấy máu" }, 
+            { id: "cay_eta", name: "Cấy ETA" }, 
+            { id: "pcr_mau", name: "PCR máu" }, 
+            { id: "pcr_eta", name: "PCR ETA" }, 
+            { id: "cdtl", name: "CDTL" }, 
+            { id: "dhmm", name: "ĐHMM" } 
+        ];
+        const imagingTests = [ { id: "xq", name: "X-quang ngực" }, { id: "sa_tim", name: "Siêu âm tim" }, { id: "sa_bung", name: "Siêu âm bụng" }, { id: "sa_nao", name: "Siêu âm não" } ];
+
+        let globalCloudHistory = [];
+
+        // --- RENDER HTML ---
+        function renderGroupRow(item, hasTrend) {
+            let html = `<div class="${hasTrend ? 'grid-nodate-trend' : 'grid-nodate-notrend'}" style="border-bottom: 1px dashed #eee; padding-bottom: 3px;">`;
+            html += `<div style="font-size: 11px; font-weight:500;">${item.name}</div>`;
+            html += `<div><input type="text" id="${item.id}_val" oninput="updateOutput()"></div>`;
+            if (hasTrend) html += `<div><select id="${item.id}_trend" onchange="updateOutput()"><option value="">-</option><option value="↑">↑</option><option value="↓">↓</option><option value="⟂">⟂</option></select></div>`;
+            if (item.noOld) { html += `<div></div>`; } else { html += `<div><input type="text" id="${item.id}_old_val" oninput="updateOutput()"></div>`; }
+            html += `</div>`;
+            return html;
+        }
+
+        function renderFullRow(item, isTextarea = false) {
+            const inputField = isTextarea ? `<textarea id="${item.id}_val" rows="1" oninput="updateOutput()"></textarea>` : `<input type="text" id="${item.id}_val" oninput="updateOutput()">`;
+            const oldInputField = isTextarea ? `<textarea id="${item.id}_old_val" rows="1" oninput="updateOutput()"></textarea>` : `<input type="text" id="${item.id}_old_val" oninput="updateOutput()">`;
+            return `
+            <div class="${isTextarea?'grid-img':'grid-full'}" style="border-bottom: 1px dashed #eee; padding-bottom: 3px;">
+                <div style="font-size: 11px; font-weight:500;">${item.name}</div>
+                <div>${inputField}</div>
+                <div><input type="text" id="${item.id}_date" oninput="updateOutput()"></div>
+                <div><select id="${item.id}_trend" onchange="updateOutput()"><option value="">-</option><option value="↑">↑</option><option value="↓">↓</option><option value="⟂">⟂</option></select></div>
+                <div>${oldInputField}</div>
+            </div>`;
+        }
+
+        function initLabInputs() {
+            document.getElementById('hd_container').innerHTML = hdLabs.map(l => renderGroupRow(l, true)).join('');
+            document.getElementById('ion_container').innerHTML = ionLabs.map(l => renderGroupRow(l, true)).join('');
+            document.getElementById('km_container').innerHTML = kmLabs.map(l => renderGroupRow(l, false)).join('');
+            document.getElementById('lab_container').innerHTML = otherLabs.map(l => renderFullRow(l, false)).join('');
+            document.getElementById('imaging_container').innerHTML = imagingTests.map(l => renderFullRow(l, true)).join('');
+        }
+
+        // --- DỊCH CHUYỂN DỮ LIỆU MỚI -> CŨ ---
+        function moveVal(id) {
+            const valEl = document.getElementById(`${id}_val`), oldEl = document.getElementById(`${id}_old_val`);
+            const trendEl = document.getElementById(`${id}_trend`);
+            if(valEl && oldEl && valEl.value) { oldEl.value = valEl.value; valEl.value = ''; }
+            if(trendEl) trendEl.value = '';
+        }
+        function moveDate(id) {
+            const dateEl = document.getElementById(`${id}_date`), oldDateEl = document.getElementById(`${id}_old_date`);
+            const compEl = document.getElementById(`${id}_comp`);
+            if(dateEl && oldDateEl && dateEl.value) { oldDateEl.value = dateEl.value; dateEl.value = ''; }
+            if(compEl) compEl.value = '';
+        }
+
+        function shiftGroupLabs(groupType) {
+            let list = [];
+            if(groupType === 'hd') { list = hdLabs; moveDate('hd'); }
+            else if(groupType === 'ion') { list = ionLabs; moveDate('ion'); }
+            else if(groupType === 'km') { list = kmLabs; moveDate('km'); }
+            else if(groupType === 'other') { list = otherLabs; list.forEach(l => moveDate(l.id)); }
+            else if(groupType === 'img') { list = imagingTests; list.forEach(l => moveDate(l.id)); }
+            
+            list.forEach(lab => { if(!lab.noOld) moveVal(lab.id); });
+            updateOutput();
+        }
+        function shiftAllLabs() { shiftGroupLabs('hd'); shiftGroupLabs('ion'); shiftGroupLabs('km'); shiftGroupLabs('other'); shiftGroupLabs('img'); }
+
+        // --- CLOUD DATABASE CONNECTIVITY (SỬA LỖI ĐỌC TRUY VẤN) ---
+        function showLoading(status) {
+            document.getElementById('loading_indicator').style.display = status ? 'inline-block' : 'none';
+        }
+
+        function fetchPatientFromCloud() {
+            const shs = document.getElementById('shs').value.trim().toUpperCase();
+            if(!shs) { alert("Hãy điền Số hồ sơ để tra cứu!"); return; }
+
+            showLoading(true);
+            // Sử dụng một lệnh gọi POST thuần túy giống như hàm save để chạy chính xác qua Redirect của Google
+            fetch(CLOUD_URL, { 
+                method: "POST", 
+                body: JSON.stringify({ action: "search", shs: shs }) 
+            })
+            .then(res => {
+                if(!res.ok) throw new Error("Không thể kết nối đến Google Sheets Server.");
+                return res.json();
+            })
+            .then(res => {
+                showLoading(false);
+                if(res.status === "success") {
+                    if(res.patient) {
+                        document.getElementById('ten_nb').value = res.patient.ten_nb || '';
+                        document.getElementById('phong').value = res.patient.phong || '';
+                        document.getElementById('giuong').value = res.patient.giuong || '';
+                        document.getElementById('gio_sinh').value = res.patient.gio_sinh || '';
+                    } else {
+                        alert("Số hồ sơ này chưa có thông tin hành chính lưu trên Cloud. Bạn có thể nhập mới.");
+                    }
+                    
+                    const select = document.getElementById('sbar_history');
+                    select.innerHTML = '<option value="">-- Chọn bản ghi cũ --</option>';
+                    globalCloudHistory = res.history || [];
+                    
+                    if(globalCloudHistory.length > 0) {
+                        document.getElementById('history-box').classList.remove('hidden');
+                        globalCloudHistory.forEach((item, index) => {
+                            let opt = document.createElement('option');
+                            opt.value = index;
+                            opt.text = `Bản ghi ngày: ${item.time}`;
+                            select.appendChild(opt);
+                        });
+                        alert(`Đã tìm thấy bệnh nhân! Phát hiện ${globalCloudHistory.length} bản SBAR cũ lưu trên Cloud.`);
+                    } else {
+                        document.getElementById('history-box').classList.add('hidden');
+                    }
+                    updateOutput();
+                } else {
+                    alert("Lỗi server: " + res.message);
+                }
+            })
+            .catch(err => { 
+                showLoading(false); 
+                alert("Lỗi kết nối Cloud: " + err.toString() + "\n\nMẹo: Hãy chắc chắn bác sĩ đã chọn mục 'Anyone' tại phần 'Who has access' khi triển khai cấu hình Apps Script."); 
+            });
+        }
+
+        function loadCloudSBARRecord() {
+            const idx = document.getElementById('sbar_history').value;
+            if(idx === "") return;
+            const data = globalCloudHistory[idx].data;
+            for(let key in data) {
+                let el = document.getElementById(key);
+                if(el) el.value = data[key];
+            }
+            updateOutput();
+        }
+
+        function saveCloudDB() {
+            const shs = document.getElementById('shs').value.trim().toUpperCase();
+            if(!shs) { alert("Thiếu Số hồ sơ (SHS). Không thể lưu!"); return; }
+
+            let data = {};
+            document.querySelectorAll('#input-form input, #input-form select, #input-form textarea').forEach(el => {
+                if(el.id && !['dict', 'output-text', 'shs', 'template', 'sbar_history'].includes(el.id)) {
+                    data[el.id] = el.value;
+                }
+            });
+
+            const payload = {
+                action: "save",
+                shs: shs,
+                ten_nb: document.getElementById('ten_nb').value,
+                phong: document.getElementById('phong').value,
+                giuong: document.getElementById('giuong').value,
+                gio_sinh: document.getElementById('gio_sinh').value,
+                time_report: document.getElementById('time_report').value || new Date().toLocaleString('vi-VN'),
+                data: data
+            };
+
+            showLoading(true);
+            fetch(CLOUD_URL, { method: "POST", body: JSON.stringify(payload) })
+            .then(res => res.json())
+            .then(res => {
+                showLoading(false);
+                if(res.status === "success") {
+                    alert("Đã đẩy dữ liệu bệnh nhân và log SBAR lên Google Sheets thành công!");
+                    fetchPatientFromCloud();
+                } else {
+                    alert("Lỗi server: " + res.message);
+                }
+            })
+            .catch(err => { showLoading(false); alert("Lỗi đẩy data: " + err.toString()); });
+        }
+
+        function saveToCloudDB() { saveCloudDB(); }
+
+        // --- THUẬT TOÁN TÍNH TUỔI SƠ SINH CHUẨN LÂM SÀNG ---
+        function parseVNDate(str) {
+            if(!str) return null;
+            str = str.toLowerCase().trim();
+            const regex = /^(?:(\d{1,2})(?:g|h|:)?(\d{0,2})\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/;
+            const match = str.match(regex);
+            if(match) {
+                let hr = parseInt(match[1]) || 0, min = parseInt(match[2]) || 0, d = parseInt(match[3]), m = parseInt(match[4]) - 1;
+                let y = match[5] ? parseInt(match[5]) : new Date().getFullYear();
+                if (y < 100) y += 2000;
+                return new Date(y, m, d, hr, min);
+            }
+            return null;
+        }
+
+        function calculateAgeString() {
+            const reportStr = document.getElementById('time_report').value;
+            const birthStr = document.getElementById('gio_sinh').value;
+            const rDate = parseVNDate(reportStr), bDate = parseVNDate(birthStr);
+            if (!rDate || !bDate || rDate < bDate) return "";
+
+            const diffMs = rDate - bDate;
+            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffHrs / 24);
+
+            if (diffHrs <= 72) return diffHrs + " giờ";
+            if (diffDays <= 14) return (diffDays + 1) + " ngày";
+            if (diffDays <= 56) {
+                const weeks = Math.floor(diffDays / 7);
+                const days = diffDays % 7;
+                return weeks + " tuần" + (days > 0 ? " " + days + " ngày" : "");
+            }
+
+            let months = (rDate.getFullYear() - bDate.getFullYear()) * 12 + (rDate.getMonth() - bDate.getMonth());
+            let tempBirth = new Date(bDate);
+            tempBirth.setMonth(tempBirth.getMonth() + months);
+            
+            if (tempBirth > rDate) { months--; tempBirth = new Date(bDate); tempBirth.setMonth(tempBirth.getMonth() + months); }
+            
+            const remDays = Math.floor((rDate - tempBirth) / (1000 * 60 * 60 * 24));
+            const weeks = Math.floor(remDays / 7);
+            const days = remDays % 7;
+
+            let res = months + " tháng";
+            if (weeks > 0) res += " " + weeks + " tuần";
+            if (days > 0) res += " " + days + " ngày";
+            return res;
+        }
+
+        // --- CÁC HÀM UI ---
+        function toggleCustomInput(selectId, inputId) { document.getElementById(inputId + '_div').classList.toggle('hidden', document.getElementById(selectId).value !== 'Khác'); updateOutput(); }
+        function toggleBtn(btn) { btn.classList.toggle('active'); updateOutput(); }
+        function toggleSuaBtn(btn, value) { document.getElementById('btn_tieu').classList.remove('active'); document.getElementById('btn_ko_tieu').classList.remove('active'); btn.classList.add('active'); document.getElementById('tinh_trang_sua').value = value; updateOutput(); }
+        
+        function handleHoHapChange() {
+            const val = document.getElementById('ho_hap').value;
+            document.getElementById('ho_hap_params').classList.toggle('hidden', val !== 'Suy hô hấp');
+            document.getElementById('ho_hap_khac_div').classList.toggle('hidden', val !== 'Khác');
+            updateOutput();
+        }
+        function handlePhuongThucTho() {
+            const pt = document.getElementById('phuong_thuc_tho').value;
+            ['may', 'fio2', 'p', 'pip', 'peep', 'rr', 'map', 'dp', 'flow'].forEach(f => document.getElementById(`div_${f}`).classList.add('hidden'));
+            if(pt==='Oxy') document.getElementById('div_fio2').classList.remove('hidden');
+            if(pt==='CPAP') { document.getElementById('div_fio2').classList.remove('hidden'); document.getElementById('div_p').classList.remove('hidden'); }
+            if(pt==='NIPPV') ['fio2','pip','peep','rr'].forEach(f => document.getElementById(`div_${f}`).classList.remove('hidden'));
+            if(pt==='SIMV') ['fio2','pip','peep','rr','map'].forEach(f => document.getElementById(`div_${f}`).classList.remove('hidden'));
+            if(pt==='HFOV') ['may','fio2','map','dp','flow'].forEach(f => document.getElementById(`div_${f}`).classList.remove('hidden'));
+            updateOutput();
+        }
+        function handleTieuHoa() {
+            const type = document.getElementById('tieu_hoa_type').value;
+            document.getElementById('tieu_hoa_tpn').classList.toggle('hidden', type !== 'TPN');
+            document.getElementById('tieu_hoa_sua').classList.toggle('hidden', type !== 'AnSua');
+            updateOutput();
+        }
+        
+        function calcUrine() {
+            const ml = parseFloat(document.getElementById('tieu_ml').value), gio = parseFloat(document.getElementById('tieu_gio').value);
+            let cn = parseFloat(document.getElementById('cn_ht').value);
+            if (isNaN(cn) || cn <= 0) cn = parseFloat(document.getElementById('cn_ls').value);
+            if (!isNaN(ml) && !isNaN(gio) && !isNaN(cn) && cn > 0) document.getElementById('tieu_kq').value = (ml / (cn/1000) / gio).toFixed(1);
+            else document.getElementById('tieu_kq').value = "";
+            updateOutput();
+        }
+        
+        function applyTemplate() {
+            const t = document.getElementById('template').value;
+            const s = document.getElementById('situation'), r = document.getElementById('recommendation'), gc = document.getElementById('ghi_chu');
+            document.getElementById('sec_hoi_chan').classList.remove('hidden');
+            if(t === 'khang_sinh') { s.value="Em xin hội chẩn v/v dùng KS cho NB"; gc.value="NB hiện đang dùng..."; r.value="HC khoa xin dùng ..."; document.getElementById('sec_hoi_chan').classList.add('hidden'); }
+            else if(t === 'surfactant') { s.value="Em xin HC v/v bơm Surfactant cho NB"; r.value="HC khoa xin dùng ... lọ Curosurf (#...mg/kg) (bơm LISA/ qua NKQ)"; document.getElementById('sec_hoi_chan').classList.add('hidden'); }
+            else if (t === 'bao_benh') { s.value="Báo cáo tình trạng NB..."; r.value=""; }
+            else { s.value=""; r.value=""; gc.value=""; }
+            updateOutput();
+        }
+
+        // --- CORE CHUỖI SBAR VỚI ĐƠN VỊ XÉT NGHIỆM ---
+        function getVal(id) { return document.getElementById(id) ? document.getElementById(id).value.trim() : ""; }
+        function formatNum(num) { return num ? Number(num).toLocaleString('vi-VN') : ""; }
+
+        function buildOutput() {
+            let out = [];
+            if(getVal('time_report')) out.push(getVal('time_report'));
+            let demo = [];
+            if(getVal('phong')) demo.push(`P${getVal('phong')}`);
+            if(getVal('giuong')) demo.push(`G${getVal('giuong')}`);
+            if(getVal('ten_nb')) demo.push(getVal('ten_nb').toUpperCase());
+            if(getVal('shs')) demo.push(getVal('shs'));
+            if(demo.length > 0) out.push(demo.join('-'));
+
+            if(getVal('situation')) out.push(`S: ${getVal('situation')}`);
+
+            let bText = "B: ";
+            const autoAge = calculateAgeString();
+            if(autoAge) bText += `NB ${autoAge}, `;
+            const t_tuan = getVal('thai_tuan'), t_ngay = getVal('thai_ngay');
+            if(t_tuan) { if(parseInt(t_tuan) >= 37) bText += "sinh đủ tháng, "; else bText += `non ${t_tuan}w${t_ngay ? t_ngay+'d' : ''}, `; }
+            if(getVal('cn_ls')) bText += `CNLS: ${formatNum(getVal('cn_ls'))}g ${getVal('bpv_ls') ? '(P'+getVal('bpv_ls')+')' : ''}, `;
+            if(getVal('cn_ht')) bText += `CNHT: ${formatNum(getVal('cn_ht'))}g ${getVal('bpv_ht') ? '(P'+getVal('bpv_ht')+')' : ''}`;
+            bText = bText.replace(/,\s*$/, "");
+            if(bText !== "B: ") out.push(bText);
+
+            let delta = [];
+            if(getVal('chan_doan_chinh')) delta.push(`${getVal('chan_doan_chinh')} ${getVal('icd_chinh') ? '('+getVal('icd_chinh')+')' : ''}`.trim());
+            if(getVal('chan_doan_phu')) delta.push(`${getVal('chan_doan_phu')} ${getVal('icd_phu') ? '('+getVal('icd_phu')+')' : ''}`.trim());
+            if(getVal('co_dia')) delta.push(getVal('co_dia'));
+            if(delta.length > 0) out.push(`Δ: ${delta.join(' - ')}`);
+
+            let aArr = [];
+            let tg = getVal('tri_giac'); if(tg === 'Khác') tg = getVal('tri_giac_khac'); if(tg) aArr.push(tg);
+
+            let hh = getVal('ho_hap');
+            if(hh === 'Suy hô hấp') {
+                const pt = getVal('phuong_thuc_tho'); let hh_str = `SHH thở ${pt}`; let h_p = [];
+                if(getVal('hh_may')) h_p.push(`máy ${getVal('hh_may')}`);
+                if(getVal('hh_pip') || getVal('hh_peep')) h_p.push(`PIP/PEEP ${getVal('hh_pip')||'_'}/${getVal('hh_peep')||'_'}`);
+                if(getVal('hh_p')) h_p.push(`P=${getVal('hh_p')}`);
+                if(getVal('hh_rr')) h_p.push(`RR ${getVal('hh_rr')}`);
+                if(getVal('hh_map')) h_p.push(`MAP ${getVal('hh_map')}`);
+                if(getVal('hh_dp')) h_p.push(`ΔP ${getVal('hh_dp')}`);
+                if(getVal('hh_flow')) h_p.push(`Flow ${getVal('hh_flow')}`);
+                if(getVal('hh_fio2')) h_p.push(`FiO2 ${getVal('hh_fio2')}%`);
+                if(h_p.length > 0) hh_str += ` ${h_p.join(', ')}`;
+                
+                let btnOxy = document.getElementById('btn_oxy_hoa').classList.contains('active'), btnTk = document.getElementById('btn_thong_khi').classList.contains('active');
+                if(btnOxy || btnTk) { let d = []; if(btnOxy) d.push('đạt oxy hoá'); if(btnTk) d.push('đạt thông khí'); hh_str += `, ${d.join(', ')}`; }
+                aArr.push(hh_str);
+            } else if (hh === 'Khác' && getVal('ho_hap_khac')) aArr.push(getVal('ho_hap_khac'));
+
+            if(getVal('mach')) aArr.push(`mạch ${getVal('mach')}l/p`);
+            if(getVal('van_mach')) aArr.push(`vận mạch ${getVal('van_mach')}`);
+            
+            const mlTieu = getVal('tieu_ml'), gioTieu = getVal('tieu_gio'), kqTieu = getVal('tieu_kq');
+            if (mlTieu && gioTieu) { aArr.push(`tiểu ${mlTieu} mL/${gioTieu} giờ${kqTieu ? ' (#'+kqTieu+' mL/kg/giờ)' : ''}`); } 
+            else if (kqTieu) { aArr.push(`tiểu ${kqTieu} mL/kg/giờ`); }
+
+            const thType = getVal('tieu_hoa_type');
+            if(thType === 'TPN') {
+                let tpn = []; if(getVal('tpn_v')) tpn.push(`V=${getVal('tpn_v')}mL/kg`); if(getVal('tpn_e')) tpn.push(`E=${getVal('tpn_e')}kcal/kg`);
+                let tpn_k = []; if(getVal('tpn_kg')) tpn_k.push(`kG: ${getVal('tpn_kg')}`); if(getVal('tpn_vk')) tpn_k.push(`vK: ${getVal('tpn_vk')}`);
+                if(tpn_k.length > 0) tpn.push(`(${tpn_k.join(', ')})`); if(tpn.length > 0) aArr.push(`TPN ${tpn.join(', ')}`);
+            } else if (thType === 'AnSua') {
+                let sArr = []; if(getVal('sua_loai')) sArr.push(getVal('sua_loai')); if(getVal('sua_v')) sArr.push(`${getVal('sua_v')}mL/kg`);
+                if(getVal('tinh_trang_sua')) sArr.push(getVal('tinh_trang_sua').toLowerCase()); if(sArr.length > 0) aArr.push(`ăn sữa ${sArr.join(' ')}`);
+            }
+            if(getVal('bung')) aArr.push(`bụng ${getVal('bung')}`);
+            let thop = getVal('thop'); if(thop === 'khác') thop = getVal('thop_khac'); if(thop) aArr.push(`thóp ${thop}`);
+            if(getVal('co_giat')) aArr.push(`co giật ${getVal('co_giat')}`);
+            if(getVal('dich')) aArr.push(`dịch: ${getVal('dich')}`);
+            if(getVal('thuc_the_khac')) aArr.push(getVal('thuc_the_khac'));
+
+            // 5. CẬN LÂM SÀNG
+            let clsArr = [];
+            
+            // HUYẾT ĐỒ
+            const wbc = getVal('wbc_val'), neu = getVal('neu_val'), plt = getVal('plt_val');
+            if (wbc || neu || plt) {
+                const hdDate = getVal('hd_date') ? `(${getVal('hd_date')})` : '';
+                let p1 = wbc ? `${wbc}${getVal('wbc_trend')}` : '_', p2 = neu ? `${neu}${getVal('neu_trend')}` : '_', p3 = plt ? `${plt}${getVal('plt_trend')}` : '_';
+                let hdLine = `- Huyết đồ ${hdDate}: WBC/Neu/PLT (k/uL): ${p1}/${p2}/${p3}`;
+                const band = getVal('band_val'); if(band) hdLine += `, Band Neu: ${band}% ${getVal('band_trend')}`;
+                const comp = getVal('hd_comp'), oldWbc = getVal('wbc_old_val'), oldNeu = getVal('neu_old_val'), oldPlt = getVal('plt_old_val'), oldBand = getVal('band_old_val');
+                if (comp || oldWbc || oldNeu || oldPlt || oldBand) {
+                    const odStr = getVal('hd_old_date') ? `(${getVal('hd_old_date')})` : '';
+                    let o1 = oldWbc || '_', o2 = oldNeu || '_', o3 = oldPlt || '_';
+                    let cStr = `${comp ? comp + ' ' : ''}so với HĐ ${odStr}: ${o1}/${o2}/${o3}`;
+                    if (oldBand) cStr += `, Band: ${oldBand}%`;
+                    hdLine += ` (${cStr.trim()})`;
+                }
+                clsArr.push(hdLine.replace(/\s+/g, ' ').trim());
+            }
+
+            // ĐIỆN GIẢI
+            const na = getVal('na_val'), k = getVal('k_val'), ca = getVal('ca_val');
+            if (na || k || ca) {
+                const dStr = getVal('ion_date') ? `(${getVal('ion_date')})` : '';
+                let p1 = na ? `${na}${getVal('na_trend')}` : '_', p2 = k ? `${k}${getVal('k_trend')}` : '_', p3 = ca ? `${ca}${getVal('ca_trend')}` : '_';
+                let ionLine = `- Điện giải đồ ${dStr}: Na/K/Ca (mmol/L): ${p1}/${p2}/${p3}`;
+                const comp = getVal('ion_comp'), oldNa = getVal('na_old_val'), oldK = getVal('k_old_val'), oldCa = getVal('ca_old_val');
+                if (oldNa || oldK || oldCa || comp) {
+                    const odStr = getVal('ion_old_date') ? `(${getVal('ion_old_date')})` : '';
+                    let o1 = oldNa || '_', o2 = oldK || '_', o3 = oldCa || '_';
+                    ionLine += ` (${comp ? comp + ' ' : ''}so với ĐG ${odStr}: ${o1}/${o2}/${o3})`;
+                }
+                clsArr.push(ionLine.replace(/\s+/g, ' ').trim());
+            }
+
+            // KHÍ MÁU
+            const kmPh = getVal('km_ph_val'), pco2 = getVal('km_pco2_val'), be = getVal('km_be_val');
+            if (kmPh || pco2 || be) {
+                const dStr = getVal('km_date') ? `(${getVal('km_date')})` : '';
+                let kmLine = `- Khí máu ${dStr}: pH/pCO2/BE: ${kmPh||'_'}/${pco2||'_'}/${be||'_'}`;
+                const docKq = getVal('km_doc_val'); if(docKq) kmLine += ` (${docKq})`;
+                const oi = getVal('km_oi_val'); if(oi) kmLine += `, OI: ${oi}`;
+                const comp = getVal('km_comp'), oldPh = getVal('km_ph_old_val'), oldPco2 = getVal('km_pco2_old_val'), oldBe = getVal('km_be_old_val');
+                if (comp || oldPh || oldPco2 || oldBe) {
+                    const odStr = getVal('km_old_date') ? `(${getVal('km_old_date')})` : '';
+                    kmLine += `, ${comp ? comp + ' ' : ''}so với KM ${odStr}: ${oldPh||'_'}/${oldPco2||'_'}/${oldBe||'_'}`;
+                }
+                clsArr.push(kmLine.replace(/\s+/g, ' ').trim());
+            }
+
+            // CÁC XÉT NGHIỆM KHÁC & HÌNH ẢNH
+            const allLabs = [...otherLabs, ...imagingTests];
+            allLabs.forEach(lab => {
+                const val = getVal(`${lab.id}_val`);
+                if(val) {
+                    const date = getVal(`${lab.id}_date`), trend = getVal(`${lab.id}_trend`), oldVal = getVal(`${lab.id}_old_val`), oldDate = getVal(`${lab.id}_old_date`), comp = getVal(`${lab.id}_comp`);
+                    
+                    let labName = lab.name;
+                    let unit = "";
+                    if(labName.includes(' (')) {
+                        const parts = labName.split(' (');
+                        labName = parts[0];
+                        unit = parts[1].replace(')', '');
+                    }
+                    
+                    let str = `-${labName}`; 
+                    if(date) str += ` (${date}): `; else str += `: `; 
+                    str += `${val} ${unit} ${trend}`.replace(/\s+/g, ' ').trim();
+                    
+                    if(oldVal || comp) {
+                        str += ` (`; 
+                        let cp = []; 
+                        if(comp) cp.push(comp); 
+                        if(oldVal) cp.push(`so với ${oldVal} ${unit}`); 
+                        if(oldDate) cp.push(`(${oldDate})`);
+                        str += `${cp.join(' ').trim()})`;
+                    }
+                    clsArr.push(str.replace(/\s+/g, ' ').trim());
+                }
+            });
+
+            let aFull = [];
+            if(aArr.length > 0) aFull.push(aArr.join(', '));
+            if(clsArr.length > 0) aFull.push("CLS:\n" + clsArr.join('\n'));
+            if(!document.getElementById('sec_hoi_chan').classList.contains('hidden') && getVal('hoi_chan')) aFull.push(`HC: ${getVal('hoi_chan')}`);
+            if(getVal('ghi_chu')) aFull.push(getVal('ghi_chu'));
+            if(aFull.length > 0) out.push(`A:\n${aFull.join('\n')}`);
+
+            if(getVal('recommendation')) out.push(`R: ${getVal('recommendation')}`);
+
+            let finalStr = out.join('\n');
+            const dictStr = getVal('dict');
+            if(dictStr) {
+                dictStr.split(/,|\n/).forEach(pair => {
+                    const parts = pair.split(':');
+                    if(parts.length === 2 && parts[0].trim() !== '') {
+                        const keyword = parts[0].trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const value = parts[1].trim();
+                        const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+                        finalStr = finalStr.replace(regex, value);
+                    }
+                });
+            }
+            document.getElementById('output-text').value = finalStr;
+            checkCharCount();
+        }
+
+        function updateOutput() { buildOutput(); }
+        function checkCharCount() {
+            const text = document.getElementById('output-text').value;
+            const countLabel = document.getElementById('char-count');
+            countLabel.innerText = `${text.length}/1000 ký tự`;
+            countLabel.classList.toggle('warning', text.length > 1000);
+        }
+        
+        function copyRawText() {
+            const textarea = document.getElementById('output-text');
+            navigator.clipboard.writeText(textarea.value).then(() => {
+                alert("Đã Copy SBAR! Định dạng dấu gạch đầu dòng (-) được giữ nguyên để paste vào Viber.");
+            });
+        }
+
+        window.onload = () => { 
+            initLabInputs(); 
+            applyTemplate(); 
+        };
+    </script>
+</body>
+</html>
